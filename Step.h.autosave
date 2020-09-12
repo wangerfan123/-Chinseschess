@@ -1,0 +1,26 @@
+#ifndef STEP_H
+#define STEP_H
+
+#include <QObject>
+
+//走棋类,悔棋时会用到,将这个类对象储存再QVector中
+class Step : public QObject
+{
+    Q_OBJECT
+public:
+    explicit Step(QObject *parent = 0);
+    ~Step();
+
+    int _moveid;//移动的棋子
+    int _killid;//吃掉的棋子
+    int _rowFrom;//原来的坐标
+    int _colFrom;
+    int _rowTo;//后来的坐标
+    int _colTo;
+
+signals:
+
+public slots:
+};
+
+#endif // STEP_H

@@ -1,0 +1,41 @@
+#ifndef NETGAME_H
+#define NETGAME_H
+
+#include "Board.h" //从棋盘类派生
+#include <QTcpServer>//TCP服务端的头文件
+#include <QTcpSocket>//TCP客户端的头文件
+
+/*
+ * 报文格式定义
+ * 1.初始化    两个字节   第一个字节是1，第二个字节01表示红棋黑棋
+ * 2.鼠标点击   四个字节  第一个字节2，第二个字节row，第三个字节col，第四个字节是点击的棋子
+ * 3.悔棋      一个字节
+ *
+*/
+//对等程序,一个做客户端,一个做服务端
+class NetGame : public Board//从棋盘类派生
+{
+    Q_OBJECT//信号和槽所用宏
+public:
+    explicit NetGame(bool server, QWidget *parent = 0);//带参构造函数,布尔代表客户端还是服务端
+    ~NetGame();
+
+    bool _bServer;//服务器还是客户端
+    QTcpServer* _server;//服务器
+    QTcpSocket* _socket;//套接字，客户端只需要用这个
+
+    void back();
+    void click(int id, int row, int col);
+
+    void backFromNetwork(QByteArray buf);//随对方变化
+    void clickFromNetwork(QByteArray buf);
+    void initFromNetwork(QByteArray buf);
+
+signals:
+
+public slots:
+    void slotNewConnection();//产生连接
+    void slotDataArrive();//数据到达
+};
+
+#endif // NETGAME_H

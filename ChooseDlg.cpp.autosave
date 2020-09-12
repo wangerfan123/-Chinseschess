@@ -1,0 +1,40 @@
+#include "ChooseDlg.h"
+#include <QVBoxLayout>
+
+//继承于QDialog类
+ChooseDlg::ChooseDlg(QWidget *parent) : QDialog(parent)
+{
+    QVBoxLayout* lay = new QVBoxLayout(this);
+    //给窗口加四个按钮
+    lay->addWidget(_buttons[0] = new QPushButton("人机对战"));
+    lay->addWidget(_buttons[1] = new QPushButton("人人对战"));
+    lay->addWidget(_buttons[2] = new QPushButton("网络对战(服务端)"));
+    lay->addWidget(_buttons[3] = new QPushButton("网络对战(客户端)"));
+
+    for(int i=0; i<4; ++i)
+    {
+        //信号就是默认信号clicked(),槽函数是点击的slotClicked
+        connect(_buttons[i], SIGNAL(clicked()), this, SLOT(slotClicked()));
+    }
+}
+
+//点击的槽函数
+void ChooseDlg::slotClicked()
+{
+    QObject* s = sender();
+    for(int i=0; i<4; ++i)
+    {
+        if(_buttons[i] == s)
+        {
+            this->_selected = i;//功能就是把成员变量设置为对应的下标
+            break;
+        }
+    }
+    accept();
+}
+
+ChooseDlg::~ChooseDlg()
+{
+
+}
+

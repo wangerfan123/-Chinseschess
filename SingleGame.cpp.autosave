@@ -1,0 +1,222 @@
+#include "SingleGame.h"
+#include <QTimer>
+#include <QDebug>
+SingleGame::SingleGame(QWidget *parent) : Board(parent)
+{
+    _level = 4;
+}
+
+SingleGame::~SingleGame()
+{
+
+}
+
+void SingleGame::back()
+{
+    if(_bRedTurn)
+    {
+        backOne();
+        backOne();
+    }
+}
+//重写点击函数，每次点击都会调用此函数
+void SingleGame::click(int id, int row, int col)
+{
+    if(_bRedTurn)//红走的才会有反应
+    {
+        Board::click(id, row, col);
+        if(!_bRedTurn)//该黑走则采用人工智能
+        {
+            //定时器0.1s，等待上一个线程执行完，防止出现卡死情况
+            QTimer::singleShot(100, this, SLOT(computerMove()));
+        }
+    }
+}
+//人工智能
+void SingleGame::computerMove()
+{
+    /*
+    1.看哪些可以走
+    2.试着走一下
+    3.评估结果
+    4.去最好的结果作为参考
+    */
+    Step* step = getBestMove();//得到最好的走棋
+    moveStone(step->_moveid, step->_killid, step->_rowTo, step->_colTo);//根据这个走棋走
+    delete step;//释放空间
+    update();//重绘
+}
+//2.试着走一下，4.最好的移动选择
+Step* SingleGame::getBestMove()
+{
+    Step* ret = NULL;
+    QVector<Step*> steps;//用来储存所有步数
+    getAllPossibleMove(steps);//得到所有的步骤
+    int maxInAllMinScore = -300000;
+
+    while(steps.count())//都不用设数值，减到0就自动为false
+    {
+        Step* step = steps.last();//从最后一个一个取出
+        steps.removeLast();
+
+        fakeMove(step); //假装移动
+        int minScore = getMinScore(this->_level-1, maxInAllMinScore);//计算当前的局面分
+        unfakeMove(step);//假装拿回来
+
+        if(minScore > maxInAllMinScore)
+        {
+            if(ret) delete ret;
+
+            ret = step; //分数最高的就是需要的
+            maxInAllMinScore = minScore;
+        }
+        else
+        {
+            delete step;//不符合就可以删除了
+        }
+    }
+    return ret;
+}
+//计算分数
+int SingleGame::score()
+{
+  //  enum TYPE{CHE, MA, PAO, BING, JIANG, SHI, XIANG};//给每一个棋子进行打分,根据局面分进行计算
+    static int s[] = {1000, 499, 501, 200, 15000, 100, 100};
+    int scoreBlack = 0;//黑棋分
+    int scoreRed = 0;//红旗分
+    for(int i=0; i<16; ++i)
+    {
+        if(_s[i]._dead) continue;//死掉就不加分
+        scoreRed += s[_s[i]._type];//加上该棋子分数
+    }
+    for(int i=16; i<32; ++i)
+    {
+        if(_s[i]._dead) continue;
+        scoreBlack += s[_s[i]._type];
+    }
+    return scoreBlack - scoreRed;//黑棋是机器一方,减去红棋的总分
+}
+//3.评估结果，最小分数
+int SingleGame::getMinScore(int level, int curMin)//第二个参数是剪枝用参数
+{
+    if(level == 0)
+        return score();
+
+    QVector<Step*> steps;
+    getAllPossibleMove(steps);
+
+    int minInAllMaxScore = 300000;//设一个很大的初始值
+
+    while(steps.count())
+    {
+        Step* step = steps.last();
+        steps.removeLast();//拿到一个再删掉
+
+        fakeMove(step);
+        int maxScore = getMaxScore(level-1, minInAllMaxScore);
+        unfakeMove(step);
+        delete step;//用完之后的对象要删除
+
+        if(maxScore <= curMin)//只有小于等于这个分数的时候才值得一算，大于就直接减掉
+        {
+            while(steps.count())
+            {
+                Step* step = steps.last();
+                steps.removeLast();
+                delete step;
+            }
+            return maxScore;
+        }
+
+        if(maxScore < minInAllMaxScore)
+        {
+            minInAllMaxScore = maxScore;
+        }
+
+
+    }
+    return minInAllMaxScore;
+}
+//3.评估结果，最大分数
+int SingleGame::getMaxScore(int level, int curMax)
+{
+    if(level == 0)//互相调用的层次
+        return score(); //递归终结条件
+
+    QVector<Step*> steps;
+    getAllPossibleMove(steps);
+    int maxInAllMinScore = -300000;
+
+    while(steps.count())
+    {
+        Step* step = steps.last();
+        steps.removeLast();
+
+        fakeMove(step);
+        int minScore = getMinScore(level-1, maxInAllMinScore);//每层减1
+        unfakeMove(step);
+        delete step;
+
+        if(minScore >= curMax)
+        {
+            while(steps.count())
+            {
+                Step* step = steps.last();
+                steps.removeLast();
+                delete step;
+            }
+            return minScore;
+        }
+        if(minScore > maxInAllMinScore)
+        {
+            maxInAllMinScore = minScore;
+        }
+
+
+    }
+    return maxInAllMinScore;
+}
+
+//假装移动
+void SingleGame::fakeMove(Step *step)
+{
+    killStone(step->_killid);//将该棋子杀死
+    moveStone(step->_moveid, step->_rowTo, step->_colTo);//将棋子移动
+}
+//再移回来
+void SingleGame::unfakeMove(Step *step)
+{
+    reliveStone(step->_killid);//复活棋子
+    moveStone(step->_moveid, step->_rowFrom, step->_colFrom);//相反方向移回来
+}
+//1.得到所有的选择
+void SingleGame::getAllPossibleMove(QVector<Step *> &steps)
+{
+    int min, max;
+    if(this->_bRedTurn) //初始化
+    {
+        min = 0, max = 16;
+    }
+    else
+    {
+        min = 16, max = 32;
+    }
+
+    for(int i=min;i<max; i++)//遍历
+    {
+        if(this->_s[i]._dead) continue;//死棋不能走
+        for(int row = 0; row<=9; ++row)
+        {
+            for(int col=0; col<=8; ++col)//所有行和列的棋子
+            {
+                int killid = this->getStoneId(row, col);//目标行列的棋子
+                if(sameColor(i, killid)) continue;//不能是一方的
+
+                if(canMove(i, killid, row, col))//是否能够移动
+                {
+                    saveStep(i, killid, row, col, steps); //能够则储存起移动的选择,放到数组中
+                }
+            }
+        }
+    }
+}
